@@ -363,6 +363,6 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glUniformMatrix4fv(glGetUniformLocation(shader, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
-		//glDrawArrays(GL_TRIANGLES, 0, tri_list.count*3);
+		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
 	}
 }
