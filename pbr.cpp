@@ -211,6 +211,8 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		"\n"
 	);
 
+	GLuint pbr_shader = shader_from_file("pbr.glsl", SHADER_VERTEX|SHADER_PIXEL|SHADER_GEOMETRY);
+
 	float3 rotation = {};
 	TriangleList *tri_list = (TriangleList*)malloc(sizeof(TriangleList));
 
@@ -269,6 +271,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 
 		glClearColor(0.5f, 0.0f, 0.5f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glEnable(GL_MULTISAMPLE);
 
 		float3 verts[1024];
 		int vert_count = 0;
@@ -345,16 +348,17 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 
 		rotation.y += 0.01f;
 
-		use_shader(shader);
+		use_shader(pbr_shader);
+		glUniform4f(glGetUniformLocation(pbr_shader, "color"), 0.0f, 0.0f, 1.0f, 1.0f);
 		mat4 projection = make_perspective_matrix(70, (float)rain.window_width/(float)rain.window_height, 0.1f, 100.0f);
 		mat4 camera = mat4_translate(make_float3(0, 0, -2.0f));
-		glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, projection.e);
-		glUniformMatrix4fv(glGetUniformLocation(shader, "camera"), 1, GL_FALSE, camera.e);
-		glUniformMatrix4fv(glGetUniformLocation(shader, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader, "projection"), 1, GL_FALSE, projection.e);
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader, "camera"), 1, GL_FALSE, camera.e);
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
 
 		glEnableVertexAttribArray(0);
 		//glEnableVertexAttribArray(1);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
+		glVertexAttribPointer(/*glGetAttribLocation(pbr_shader, "position")*/0, 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
 		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
 
 		use_shader(normal_shader);
@@ -363,6 +367,6 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glUniformMatrix4fv(glGetUniformLocation(shader, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
-		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
+		//glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
 	}
 }
