@@ -88,7 +88,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 	//glEnable(GL_CULL_FACE);
 	glCullFace(GL_BACK);
 
-	GLuint shader = shader_from_string(
+	Shader shader = shader_from_string(
 		"#version 330\n"
 		"in vec3 position;\n"
 		"in vec3 normal;\n"
@@ -163,7 +163,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		"\n"
 	);
 
-	GLuint normal_shader = shader_from_string(
+	Shader normal_shader = shader_from_string(
 		"#version 330\n"
 		"in vec3 position;\n"
 		"void main() {\n"
@@ -211,7 +211,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		"\n"
 	);
 
-	GLuint pbr_shader = shader_from_file("pbr.glsl", SHADER_VERTEX|SHADER_PIXEL|SHADER_GEOMETRY);
+	Shader pbr_shader = shader_from_file("pbr.glsl", SHADER_VERTEX|SHADER_PIXEL|SHADER_GEOMETRY);
 
 	float3 rotation = {};
 	TriangleList *tri_list = (TriangleList*)malloc(sizeof(TriangleList));
@@ -348,25 +348,45 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 
 		rotation.y += 0.01f;
 
-		use_shader(pbr_shader);
-		glUniform4f(glGetUniformLocation(pbr_shader, "color"), 0.0f, 0.0f, 1.0f, 1.0f);
+		use_shader(&pbr_shader);
+		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), /*1.0f, 1.0f, 1.0f*/0.0f, 0.0f, 1.0f, 1.0f);
 		mat4 projection = make_perspective_matrix(70, (float)rain.window_width/(float)rain.window_height, 0.1f, 100.0f);
-		mat4 camera = mat4_translate(make_float3(0, 0, -2.0f));
-		glUniformMatrix4fv(glGetUniformLocation(pbr_shader, "projection"), 1, GL_FALSE, projection.e);
-		glUniformMatrix4fv(glGetUniformLocation(pbr_shader, "camera"), 1, GL_FALSE, camera.e);
-		glUniformMatrix4fv(glGetUniformLocation(pbr_shader, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
+		mat4 camera = mat4_translate(make_float3(0, 0, -5.0f));
+		float4 light_position = make_float4(5.0f, 5.0f, 5.0f, 1.0f);
+		float4_apply_mat4(&light_position, euler_to_mat4(rotation));
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "projection"), 1, GL_FALSE, projection.e);
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "camera"), 1, GL_FALSE, camera.e);
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
+		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "light_position"), light_position.x, light_position.y, light_position.z, light_position.w);
 
-		glEnableVertexAttribArray(0);
-		//glEnableVertexAttribArray(1);
-		glVertexAttribPointer(/*glGetAttribLocation(pbr_shader, "position")*/0, 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
+		glEnableVertexAttribArray(glGetAttribLocation(pbr_shader.gl_program, "position"));
+		glVertexAttribPointer(glGetAttribLocation(pbr_shader.gl_program, "position"), 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
+
+		mat4 translation = mat4_translate(make_float3(-2.0f, 0, 0.0f));
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
 		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
 
-		use_shader(normal_shader);
-		glUniformMatrix4fv(glGetUniformLocation(shader, "projection"), 1, GL_FALSE, projection.e);
-		glUniformMatrix4fv(glGetUniformLocation(shader, "camera"), 1, GL_FALSE, camera.e);
-		glUniformMatrix4fv(glGetUniformLocation(shader, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
-		glEnableVertexAttribArray(0);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
+		translation = mat4_translate(make_float3(2.0f, 0, 0.0f));
+		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
+		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
+
+		use_shader(&normal_shader);
+		glUniformMatrix4fv(glGetUniformLocation(shader.gl_program, "projection"), 1, GL_FALSE, projection.e);
+		glUniformMatrix4fv(glGetUniformLocation(shader.gl_program, "camera"), 1, GL_FALSE, camera.e);
+		glUniformMatrix4fv(glGetUniformLocation(shader.gl_program, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
+		glEnableVertexAttribArray(glGetAttribLocation(pbr_shader.gl_program, "position"));
+		glVertexAttribPointer(glGetAttribLocation(pbr_shader.gl_program, "position"), 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
 		//glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
+
+		no_shader();
+		glLoadMatrixf(projection.e);
+		glPointSize(10);
+		glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
+		glBegin(GL_POINTS);
+		float4 v = make_float4(light_position.x, light_position.y, light_position.z, 1.0f);
+		float4_apply_mat4(&v, camera);
+		//glVertex3f(light_position.x, light_position.y, light_position.z);
+		glVertex3f(v.x, v.y, v.z);
+		glEnd();
 	}
 }
