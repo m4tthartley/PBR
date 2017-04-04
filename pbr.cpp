@@ -78,8 +78,8 @@ void add_triangle(TriangleList *list, Triangle tri) {
 
 int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdline, int showcmd) {
 	Rain rain = {0};
-	rain.window_width = 1280;
-	rain.window_height = 720;
+	rain.window_width = 1920;
+	rain.window_height = 1080;
 	rain_init(&rain);
 
 	load_opengl_extensions();
@@ -269,7 +269,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 	while (!rain.quit) {
 		rain_update(&rain);
 
-		glClearColor(0.5f, 0.0f, 0.5f, 1.0f);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glEnable(GL_MULTISAMPLE);
 
@@ -346,13 +346,13 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 			9, 10, 11
 		};*/
 
-		rotation.y += 0.01f;
+		//rotation.y += 0.01f;
 
 		use_shader(&pbr_shader);
-		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), /*1.0f, 1.0f, 1.0f*/0.0f, 0.0f, 1.0f, 1.0f);
+		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), /*1.0f, 1.0f, 1.0f*//*0.2f, 1.0f, 1.0f*/1.0f, 0.0f, 0.0f, 1.0f);
 		mat4 projection = make_perspective_matrix(70, (float)rain.window_width/(float)rain.window_height, 0.1f, 100.0f);
-		mat4 camera = mat4_translate(make_float3(0, 0, -5.0f));
-		float4 light_position = make_float4(5.0f, 5.0f, 5.0f, 1.0f);
+		mat4 camera = mat4_translate(make_float3(0, 0, -7.0f));
+		float4 light_position = make_float4(2.0f, 1.0f, 5.0f, 1.0f);
 		float4_apply_mat4(&light_position, euler_to_mat4(rotation));
 		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "projection"), 1, GL_FALSE, projection.e);
 		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "camera"), 1, GL_FALSE, camera.e);
@@ -362,13 +362,25 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glEnableVertexAttribArray(glGetAttribLocation(pbr_shader.gl_program, "position"));
 		glVertexAttribPointer(glGetAttribLocation(pbr_shader.gl_program, "position"), 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
 
-		mat4 translation = mat4_translate(make_float3(-2.0f, 0, 0.0f));
-		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
-		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
+		int num = 7;
+		for (int y = 0; y < num; ++y)
+		for (int x = 0; x < num; ++x) {
+			float px = -1.2f*((int)num/2) + x*1.2f;
+			float py = -1.2f*((int)num/2) + y*1.2f;
+			float cx = x * (1.0f / ((float)num-1));
+			float cy = y * (1.0f / ((float)num-1));
+			mat4 translation = mat4_translate(make_float3(px, py, 0.0f));
+			glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
 
-		translation = mat4_translate(make_float3(2.0f, 0, 0.0f));
+			glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), cx, cy, 1.0f, 1.0f);
+			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "roughness"), cx);
+			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "metallic"), cy);
+			glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
+		}
+
+		/*translation = mat4_translate(make_float3(2.0f, 0, 0.0f));
 		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
-		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
+		glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);*/
 
 		use_shader(&normal_shader);
 		glUniformMatrix4fv(glGetUniformLocation(shader.gl_program, "projection"), 1, GL_FALSE, projection.e);
