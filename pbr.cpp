@@ -270,17 +270,82 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 	};
 	add_triangle(tri_list, t7);
 
-	int width;
-	int height;
-	int components;
-	float *image_data = stbi_loadf("GravelPlaza_REF.hdr", &width, &height, &components, 0);
-	GLuint test_texture;
-	glGenTextures(1, &test_texture);
-	glBindTexture(GL_TEXTURE_2D, test_texture);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	stbi_image_free(image_data);
+	GLuint skybox[3];
+	GLuint env_map[3];
+	int current_env_map = 0;
+
+	{
+		int width;
+		int height;
+		int components;
+		float *image_data = stbi_loadf("GravelPlaza_REF.hdr", &width, &height, &components, 0);
+		glGenTextures(1, &skybox[0]);
+		glBindTexture(GL_TEXTURE_2D, skybox[0]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		stbi_image_free(image_data);
+	}
+	{
+		int width;
+		int height;
+		int components;
+		float *image_data = stbi_loadf("GravelPlaza_ENV.hdr", &width, &height, &components, 0);
+		glGenTextures(1, &env_map[0]);
+		glBindTexture(GL_TEXTURE_2D, env_map[0]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		stbi_image_free(image_data);
+	}
+	{
+		int width;
+		int height;
+		int components;
+		float *image_data = stbi_loadf("Arches_E_PineTree_3k.hdr", &width, &height, &components, 0);
+		glGenTextures(1, &skybox[1]);
+		glBindTexture(GL_TEXTURE_2D, skybox[1]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		stbi_image_free(image_data);
+	}
+	{
+		int width;
+		int height;
+		int components;
+		float *image_data = stbi_loadf("Arches_E_PineTree_ENV.hdr", &width, &height, &components, 0);
+		glGenTextures(1, &env_map[1]);
+		glBindTexture(GL_TEXTURE_2D, env_map[1]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		stbi_image_free(image_data);
+	}
+	{
+		int width;
+		int height;
+		int components;
+		float *image_data = stbi_loadf("Frozen_Waterfall_Ref.hdr", &width, &height, &components, 0);
+		glGenTextures(1, &skybox[2]);
+		glBindTexture(GL_TEXTURE_2D, skybox[2]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		stbi_image_free(image_data);
+	}
+	{
+		int width;
+		int height;
+		int components;
+		float *image_data = stbi_loadf("Frozen_Waterfall_Env.hdr", &width, &height, &components, 0);
+		glGenTextures(1, &env_map[2]);
+		glBindTexture(GL_TEXTURE_2D, env_map[2]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		stbi_image_free(image_data);
+	}
 
 	while (!rain.quit) {
 		rain_update(&rain);
@@ -368,6 +433,13 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 			camera_rotation.x += rain.mouse.position_delta.y * 0.01f;
 		}
 
+		if (!rain.input.keys[VK_UP] && rain.input.keys_last[VK_UP] && current_env_map < array_size(env_map)-1) {
+			++current_env_map;
+		}
+		if (!rain.input.keys[VK_DOWN] && rain.input.keys_last[VK_DOWN] && current_env_map > 0) {
+			--current_env_map;
+		}
+
 		//rotation.y += 0.01f;
 
 		use_shader(&pbr_shader);
@@ -402,10 +474,13 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].position"), -3.0f, 4.0f, 5.0f);
 		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].position"), -3.0f, -3.0f, 3.0f);
 		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].position"), 3.0f, -2.0f, 4.0f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].color"), 0.5f, 1.0f, 0.5f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].color"), 0.1f, 1.0f, 0.1f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].color"), 0.1f, 1.0f, 0.1f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].color"), 0.5f, 1.0f, 0.5f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].color"), 1.0f, 1.0f, 1.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].color"), 0.5f, 1.0f, 0.5f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].color"), 0.5f, 1.0f, 0.5f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].color"), 1.0f, 1.0f, 1.0f);
+
+		glBindTexture(GL_TEXTURE_2D, env_map[current_env_map]);
+		glUniform1i(glGetUniformLocation(pbr_shader.gl_program, "env_map"), 0);
 
 		glEnableVertexAttribArray(glGetAttribLocation(pbr_shader.gl_program, "position"));
 		glVertexAttribPointer(glGetAttribLocation(pbr_shader.gl_program, "position"), 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
@@ -420,7 +495,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 			mat4 translation = mat4_translate(make_float3(px, py, 0.0f));
 			glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
 
-			glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "material.albedo"), 0.2f, 0, 0.3f);
+			glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "material.albedo"), /*0.2f, 0, 0.3f*/1, 1, 1);
 			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "material.roughness"), cx);
 			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "material.metallic"), cy);
 			glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
@@ -471,7 +546,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glUniformMatrix4fv(glGetUniformLocation(skybox_shader.gl_program, "camera"), 1, GL_FALSE, camera.e);
 
 		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, test_texture);
+		glBindTexture(GL_TEXTURE_2D, skybox[current_env_map]);
 
 		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 1.0f, 0, 0.0f);
 		glBegin(GL_QUADS);

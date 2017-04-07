@@ -5,6 +5,17 @@ uniform mat4 camera;
 uniform mat4 rotation;
 uniform mat4 translation;
 
+uniform sampler2D env_map;
+
+vec3 sample_equirectangle(sampler2D tex, vec3 n) {
+	vec3 v = n;
+	vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+	uv *= vec2(0.1591, 0.3183);
+	uv += 0.5;
+	uv.y *= -1;
+	return texture(tex, uv).rgb;
+}
+
 struct Light {
 	vec3 position;
 	vec3 color;
@@ -48,6 +59,10 @@ void main() {
 //vec3 fresnel_plastic_high = vec3(0.05f, 0.05f, 0.05f);
 
 // Fresnel-Schlick
+vec3 brdf_fresnel_roughness(vec3 h, vec3 v, vec3 f0, float roughness) {
+	float costheta = max(dot(h, v), 0.0f);
+	return f0 + ((max(vec3(1.0f - roughness), f0) - f0) * pow(1.0 - costheta, 5.0f));
+}
 vec3 brdf_fresnel(vec3 h, vec3 v, vec3 f0) {
 	float costheta = max(dot(h, v), 0.0f);
 	return f0 + ((1.0f - f0)*pow(1 - costheta, 5.0f));
@@ -93,15 +108,17 @@ void main() {
 	float roughness = material.roughness * (0.9) + 0.05;
 	float metallic = material.metallic;
 
+	vec3 f0 = mix(vec3(0.04f), albedo, metallic);
+	vec3 v = -normalize(ex_position - camera_position);
+	vec3 n = normalize(ex_normal);
+
 	vec3 Lo = vec3(0.0);
 	for (int i = 0; i < NUM_LIGHTS; ++i) {
 		vec3 light_dir = normalize(lights[i].position - ex_position);
 		float light_dist = length(lights[i].position - ex_position);
 		vec3 radiance = vec3(300.0) * lights[i].color * (1.0 / (light_dist*light_dist));
 
-		vec3 v = -normalize(ex_position - camera_position);
 		vec3 l = light_dir;
-		vec3 n = normalize(ex_normal);
 		vec3 h = normalize(v + l);
 
 		/*if (dot(n, v) > 0.999) {
@@ -112,7 +129,6 @@ void main() {
 		float ndotl = max(dot(n, l), 0.0f);
 		float ndotv = max(dot(n, v), 0.0f);
 		
-		vec3 f0 = mix(vec3(0.04f), albedo, metallic);
 		vec3 fresnel = brdf_fresnel(h, v, f0);
 		vec3 kd = vec3(1.0f) - fresnel;
 		kd *= 1.0f - metallic;
@@ -126,7 +142,13 @@ void main() {
 		Lo += (kd*lambert + specular) * radiance * ndotl;
 	}
 
-	vec3 ambient = vec3(0.03) * albedo;
+	vec3 ks = brdf_fresnel_roughness(n, v, f0, roughness);
+	vec3 kd = 1.0 - ks;
+	vec3 irradiance = sample_equirectangle(env_map, n);
+
+	/*vec3 ambient = vec3(0.03) * albedo;*/
+	vec3 ambient = kd * irradiance * albedo;
+
 	vec3 output = ambient + Lo;
 	output = output / (output + vec3(1.0f));
 	output = pow(output, vec3(1.0f/2.2f));
