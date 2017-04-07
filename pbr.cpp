@@ -7,6 +7,9 @@
 #include "w:/libs/math.c"
 #include "w:/libs/gfx.c"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "w:/lib/stb_image.h"
+
 typedef struct {
 	float3 v[3];
 } Triangle;
@@ -212,6 +215,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 	);
 
 	Shader pbr_shader = shader_from_file("pbr.glsl", SHADER_VERTEX|SHADER_PIXEL|SHADER_GEOMETRY);
+	Shader skybox_shader = shader_from_file("skybox.glsl", SHADER_VERTEX|SHADER_PIXEL);
 
 	float3 rotation = {};
 	TriangleList *tri_list = (TriangleList*)malloc(sizeof(TriangleList));
@@ -265,6 +269,18 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		make_float3(0.0f, -1.0f, 0.0f)
 	};
 	add_triangle(tri_list, t7);
+
+	int width;
+	int height;
+	int components;
+	float *image_data = stbi_loadf("GravelPlaza_REF.hdr", &width, &height, &components, 0);
+	GLuint test_texture;
+	glGenTextures(1, &test_texture);
+	glBindTexture(GL_TEXTURE_2D, test_texture);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	stbi_image_free(image_data);
 
 	while (!rain.quit) {
 		rain_update(&rain);
@@ -356,7 +372,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 
 		use_shader(&pbr_shader);
 		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), /*1.0f, 1.0f, 1.0f*//*0.2f, 1.0f, 1.0f*/1.0f, 0.0f, 0.0f, 1.0f);
-		mat4 projection = make_perspective_matrix(/*70*/70, (float)rain.window_width/(float)rain.window_height, 0.1f, 100.0f);
+		mat4 projection = make_perspective_matrix(/*70*/70, (float)rain.window_width/(float)rain.window_height, 0.1f, 1000.0f);
 
 		float3 camera_p = make_float3(0.0, 0, 7.0f);
 		float4 camera_position = {camera_p.x, camera_p.y, camera_p.z, 0.0f};
@@ -382,8 +398,14 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 
 		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
 
-		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].position"), 2.0f, 1.0f, 5.0f, 1.0f);
-		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].position"), -3.0f, 4.0f, 5.0f, 1.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].position"), 2.0f, 1.0f, 5.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].position"), -3.0f, 4.0f, 5.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].position"), -3.0f, -3.0f, 3.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].position"), 3.0f, -2.0f, 4.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].color"), 0.5f, 1.0f, 0.5f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].color"), 0.1f, 1.0f, 0.1f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].color"), 0.1f, 1.0f, 0.1f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].color"), 0.5f, 1.0f, 0.5f);
 
 		glEnableVertexAttribArray(glGetAttribLocation(pbr_shader.gl_program, "position"));
 		glVertexAttribPointer(glGetAttribLocation(pbr_shader.gl_program, "position"), 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
@@ -398,9 +420,9 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 			mat4 translation = mat4_translate(make_float3(px, py, 0.0f));
 			glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "translation"), 1, GL_FALSE, translation.e);
 
-			glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), /*cx, cy, 1.0f*/1.0f, 0.0f, 0.0f, 1.0f);
-			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "roughness"), cx);
-			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "metallic"), cy);
+			glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "material.albedo"), 0.2f, 0, 0.3f);
+			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "material.roughness"), cx);
+			glUniform1f(glGetUniformLocation(pbr_shader.gl_program, "material.metallic"), cy);
 			glDrawArrays(GL_TRIANGLES, 0, tri_list->count*3);
 		}
 
@@ -427,5 +449,93 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		//glVertex3f(light_position.x, light_position.y, light_position.z);
 		glVertex3f(v.x, v.y, v.z);
 		glEnd();
+
+#if 0
+		glLoadMatrixf(mat4_identity().e);
+		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, test_texture);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0, 1.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0, 1.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0, 0.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0, 0.0);
+		glEnd();
+		glDisable(GL_TEXTURE_2D);
+#endif
+
+		// Skybox
+		use_shader(&skybox_shader);
+		glUniformMatrix4fv(glGetUniformLocation(skybox_shader.gl_program, "projection"), 1, GL_FALSE, projection.e);
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "camera_position"), camera_position.x, camera_position.y, camera_position.z);		
+		glUniformMatrix4fv(glGetUniformLocation(skybox_shader.gl_program, "camera"), 1, GL_FALSE, camera.e);
+
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, test_texture);
+
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 1.0f, 0, 0.0f);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(-100.0, 100.0, -100.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(100.0, 100.0, -100.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(100.0, -100.0, -100.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(-100.0, -100.0, -100.0);
+		glEnd();
+		
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 0.0f, 1.0f, 0.0f);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(-100.0, 100.0, 100.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(-100.0, 100.0, -100.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(-100.0, -100.0, -100.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(-100.0, -100.0, 100.0);
+		glEnd();
+
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 0.0f, 0.0f, 1.0f);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(100.0, 100.0, -100.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(100.0, 100.0, 100.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(100.0, -100.0, 100.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(100.0, -100.0, -100.0);
+		glEnd();
+
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 1.0f, 0, 1.0f);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(100.0, 100.0, 100.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(-100.0, 100.0, 100.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(-100.0, -100.0, 100.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(100.0, -100.0, 100.0);
+		glEnd();
+
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 1.0f, 1, 0.0f);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(-100.0, 100.0, 100.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(100.0, 100.0, 100.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(100.0, 100.0, -100.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(-100.0, 100.0, -100.0);
+		glEnd();
+
+		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "color"), 0.0f, 1, 1.0f);
+		glBegin(GL_QUADS);
+		glTexCoord2f(0.0f, 0.0f); glVertex3f(-100.0, -100.0, -100.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex3f(100.0, -100.0, -100.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex3f(100.0, -100.0, 100.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex3f(-100.0, -100.0, 100.0);
+		glEnd();
+
+		/*glColor4f(0.0f, 1.0f, 0.0f, 1.0f);
+		glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0, 1.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0, 1.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0, 0.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0, 0.0);
+		glColor4f(0.0f, 0.0f, 1.0f, 1.0f);
+		glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0, 1.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0, 1.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0, 0.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0, 0.0);
+		glColor4f(1.0f, 0.0f, 1.0f, 1.0f);
+		glTexCoord2f(0.0f, 0.0f); glVertex2f(0.0, 1.0);
+		glTexCoord2f(1.0f, 0.0f); glVertex2f(1.0, 1.0);
+		glTexCoord2f(1.0f, 1.0f); glVertex2f(1.0, 0.0);
+		glTexCoord2f(0.0f, 1.0f); glVertex2f(0.0, 0.0);*/
+		
 	}
 }
