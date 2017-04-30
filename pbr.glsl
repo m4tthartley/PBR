@@ -6,6 +6,7 @@ uniform mat4 rotation;
 uniform mat4 translation;
 
 uniform sampler2D env_map;
+uniform sampler2D spec_map;
 
 vec3 sample_equirectangle(sampler2D tex, vec3 n) {
 	vec3 v = n;
@@ -85,6 +86,22 @@ float brdf_geometry(vec3 n, vec3 v, vec3 l, float roughness) {
 	return ggx0 * ggx1;
 }
 
+float brdf_geometry_sub_ibl(float ndotv, float k) {
+	return ndotv / (ndotv * (1.0f - k) + k);
+}
+float brdf_geometry_ibl(vec3 n, vec3 v, vec3 l, float roughness) {
+	float ndotl = max(dot(n, l), 0.0f);
+	float ndotv = max(dot(n, v), 0.0f);
+
+	float k = roughness;
+	k = (k*k) / 2.0;
+
+	float ggx0 = brdf_geometry_sub_ibl(ndotv, k);
+	float ggx1 = brdf_geometry_sub_ibl(ndotl, k);
+
+	return ggx0 * ggx1;
+}
+
 // Trowbridge-Reitz GGX
 float brdf_distribution(vec3 n, vec3 h, float roughness) {
 	float ndoth = max(dot(n, h), 0.0f);
@@ -98,25 +115,114 @@ float brdf_distribution(vec3 n, vec3 h, float roughness) {
 	return a2 / (PI * denom * denom);
 }
 
+vec3 importance_sample_ggx(vec2 xi, vec3 n, float roughness) {
+	float a = roughness*roughness;
+	float phi = 2.0 * PI * xi.x;
+	float costheta = sqrt((1.0 - xi.y) / (1.0 + (a*a - 1.0) * xi.y));
+	float sintheta = sqrt(1.0 - costheta*costheta);
+
+	vec3 h = vec3(cos(phi) * sintheta, sin(phi) * sintheta, costheta);
+	vec3 up = abs(n.z) < 0.999 ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);
+	vec3 tangent = normalize(cross(up, n));
+	vec3 bitangent = cross(n, tangent);
+
+	return normalize(tangent * h.x + bitangent * h.y + n * h.z);
+}
+
+vec2 hammersley(uint i, uint n) {
+	uint bits = i;
+
+	bits = (bits << 16u) | (bits >> 16u);
+	bits = ((bits & 0x55555555u) << 1u) | ((bits & 0xAAAAAAAAu) >> 1u);
+	bits = ((bits & 0x33333333u) << 2u) | ((bits & 0xCCCCCCCCu) >> 2u);
+	bits = ((bits & 0x0F0F0F0Fu) << 4u) | ((bits & 0xF0F0F0F0u) >> 4u);
+	bits = ((bits & 0x00FF00FFu) << 8u) | ((bits & 0xFF00FF00u) >> 8u);
+	float radical_inverse = float(bits) * 2.3283064365386963e-10;
+
+	return vec2(float(i)/float(n), radical_inverse);
+}
+
+vec3 specular_env_map(vec3 n, float roughness) {
+	vec3 r = n;
+	vec3 v = r;
+
+	const uint SAMPLE_COUNT = 100u;
+	float totalWeight = 0.0;   
+	vec3 prefilteredColor = vec3(0.0);     
+	for(uint i = 0u; i < SAMPLE_COUNT; ++i) {
+		vec2 xi = hammersley(i, SAMPLE_COUNT);
+		vec3 h = importance_sample_ggx(xi, n, roughness);
+		vec3 l = normalize(2.0 * dot(v, h) * h - v);
+
+		float NdotL = max(dot(n, l), 0.0);
+		if(NdotL > 0.0) {
+			prefilteredColor += sample_equirectangle(spec_map, l).rgb * NdotL;
+			totalWeight += NdotL;
+		}
+	}
+	prefilteredColor = prefilteredColor / totalWeight;
+
+	return prefilteredColor;
+}
+
+vec2 integrate_brdf(float NdotV, float roughness) {
+    vec3 V;
+    V.x = sqrt(1.0 - NdotV*NdotV);
+    V.y = 0.0;
+    V.z = NdotV;
+
+    float A = 0.0;
+    float B = 0.0;
+
+    vec3 N = vec3(0.0, 0.0, 1.0);
+
+    const uint SAMPLE_COUNT = 100u;
+    for(uint i = 0u; i < SAMPLE_COUNT; ++i)
+    {
+        vec2 Xi = hammersley(i, SAMPLE_COUNT);
+        vec3 H  = importance_sample_ggx(Xi, N, roughness);
+        vec3 L  = normalize(2.0 * dot(V, H) * H - V);
+
+        float NdotL = max(L.z, 0.0);
+        float NdotH = max(H.z, 0.0);
+        float VdotH = max(dot(V, H), 0.0);
+
+        if(NdotL > 0.0)
+        {
+            float G = brdf_geometry_ibl(N, V, L, roughness);
+            float G_Vis = (G * VdotH) / (NdotH * NdotV);
+            float Fc = pow(1.0 - VdotH, 5.0);
+
+            A += (1.0 - Fc) * G_Vis;
+            B += Fc * G_Vis;
+        }
+    }
+    A /= float(SAMPLE_COUNT);
+    B /= float(SAMPLE_COUNT);
+    return vec2(A, B);
+}
+
 #ifdef SHADER_PIXEL
 in vec3 ex_position;
 in vec3 ex_position_from_camera;
 in vec3 ex_normal;
 out vec4 pixel;
 void main() {
-	vec3 albedo = material.albedo;
+	//vec3 albedo = /*material.albedo*/vec3(1.0, 0.05, 0.05);
+	vec3 albedo = vec3(0.0, 0.1, 0.1);
 	float roughness = material.roughness * (0.9) + 0.05;
-	float metallic = material.metallic;
+	float metallic = material.metallic * (0.9) + 0.05;
 
 	vec3 f0 = mix(vec3(0.04f), albedo, metallic);
 	vec3 v = -normalize(ex_position - camera_position);
 	vec3 n = normalize(ex_normal);
+	float ndotv = max(dot(n, v), 0.0f);
 
 	vec3 Lo = vec3(0.0);
 	for (int i = 0; i < NUM_LIGHTS; ++i) {
 		vec3 light_dir = normalize(lights[i].position - ex_position);
 		float light_dist = length(lights[i].position - ex_position);
-		vec3 radiance = vec3(300.0) * lights[i].color * (1.0 / (light_dist*light_dist));
+		vec3 radiance = vec3(30.0) * lights[i].color * (1.0 / (light_dist*light_dist));
 
 		vec3 l = light_dir;
 		vec3 h = normalize(v + l);
@@ -127,8 +233,7 @@ void main() {
 		}*/
 
 		float ndotl = max(dot(n, l), 0.0f);
-		float ndotv = max(dot(n, v), 0.0f);
-		
+				
 		vec3 fresnel = brdf_fresnel(h, v, f0);
 		vec3 kd = vec3(1.0f) - fresnel;
 		kd *= 1.0f - metallic;
@@ -147,12 +252,23 @@ void main() {
 	vec3 irradiance = sample_equirectangle(env_map, n);
 
 	/*vec3 ambient = vec3(0.03) * albedo;*/
-	vec3 ambient = kd * irradiance * albedo;
+	vec3 diffuse = kd * irradiance * albedo;
+
+	vec3 pre_color = specular_env_map(reflect(-v, n), roughness);
+	vec2 brdf = integrate_brdf(ndotv, roughness);
+	vec3 specular = pre_color * (ks * brdf.x + brdf.y);
+
+	vec3 ambient = (kd * diffuse + specular);
 
 	vec3 output = ambient + Lo;
 	output = output / (output + vec3(1.0f));
 	output = pow(output, vec3(1.0f/2.2f));
 
 	pixel = vec4(output, 1.0f);
+
+	
+	// pixel = vec4(specular, 1.0);
+	// pixel = vec4(, 0.0, 1.0);
+
 }
 #endif

@@ -23,9 +23,9 @@ typedef struct {
 void add_tess_triangle(TriangleList *list, Triangle tri) {
 	++list->current_level;
 
-	tri.v[0] = normalize(tri.v[0]);
-	tri.v[1] = normalize(tri.v[1]);
-	tri.v[2] = normalize(tri.v[2]);
+	tri.v[0] = normalize3(tri.v[0]);
+	tri.v[1] = normalize3(tri.v[1]);
+	tri.v[2] = normalize3(tri.v[2]);
 
 	float3 l0 = sub3(tri.v[1], tri.v[0]);
 	float3 l1 = sub3(tri.v[2], tri.v[1]);
@@ -37,9 +37,9 @@ void add_tess_triangle(TriangleList *list, Triangle tri) {
 	float3 v0 = tri.v[0];
 	float3 v1 = tri.v[1];
 	float3 v2 = tri.v[2];
-	h0 = normalize(h0);
-	h1 = normalize(h1);
-	h2 = normalize(h2);
+	h0 = normalize3(h0);
+	h1 = normalize3(h1);
+	h2 = normalize3(h2);
 
 	if (list->current_level < list->tess_level) {
 		/*add_vert(v0);
@@ -302,7 +302,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		int width;
 		int height;
 		int components;
-		float *image_data = stbi_loadf("Arches_E_PineTree_3k.hdr", &width, &height, &components, 0);
+		float *image_data = stbi_loadf("Frozen_Waterfall_Ref.hdr", &width, &height, &components, 0);
 		glGenTextures(1, &skybox[1]);
 		glBindTexture(GL_TEXTURE_2D, skybox[1]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
@@ -314,7 +314,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		int width;
 		int height;
 		int components;
-		float *image_data = stbi_loadf("Arches_E_PineTree_ENV.hdr", &width, &height, &components, 0);
+		float *image_data = stbi_loadf("Frozen_Waterfall_Env.hdr", &width, &height, &components, 0);
 		glGenTextures(1, &env_map[1]);
 		glBindTexture(GL_TEXTURE_2D, env_map[1]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
@@ -326,7 +326,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		int width;
 		int height;
 		int components;
-		float *image_data = stbi_loadf("Frozen_Waterfall_Ref.hdr", &width, &height, &components, 0);
+		float *image_data = stbi_loadf("Arches_E_PineTree_3k.hdr", &width, &height, &components, 0);
 		glGenTextures(1, &skybox[2]);
 		glBindTexture(GL_TEXTURE_2D, skybox[2]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
@@ -338,7 +338,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		int width;
 		int height;
 		int components;
-		float *image_data = stbi_loadf("Frozen_Waterfall_Env.hdr", &width, &height, &components, 0);
+		float *image_data = stbi_loadf("Arches_E_PineTree_ENV.hdr", &width, &height, &components, 0);
 		glGenTextures(1, &env_map[2]);
 		glBindTexture(GL_TEXTURE_2D, env_map[2]);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, width, height, 0, GL_RGB, GL_FLOAT, image_data);
@@ -369,12 +369,12 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		float3 h1 = add3(v1, div3f(l1, 2.0f));
 		float3 h2 = add3(v2, div3f(l2, 2.0f));
 
-		v0 = normalize(v0);
-		v1 = normalize(v1);
-		v2 = normalize(v2);
-		h0 = normalize(h0);
-		h1 = normalize(h1);
-		h2 = normalize(h2);
+		v0 = normalize3(v0);
+		v1 = normalize3(v1);
+		v2 = normalize3(v2);
+		h0 = normalize3(h0);
+		h1 = normalize3(h1);
+		h2 = normalize3(h2);
 
 		add_vert(v0);
 		add_vert(h0);
@@ -433,10 +433,10 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 			camera_rotation.x += rain.mouse.position_delta.y * 0.01f;
 		}
 
-		if (!rain.input.keys[VK_UP] && rain.input.keys_last[VK_UP] && current_env_map < array_size(env_map)-1) {
+		if (rain.keys[KEY_UP].pressed && current_env_map < array_size(env_map)-1) {
 			++current_env_map;
 		}
-		if (!rain.input.keys[VK_DOWN] && rain.input.keys_last[VK_DOWN] && current_env_map > 0) {
+		if (rain.keys[KEY_DOWN].pressed && current_env_map > 0) {
 			--current_env_map;
 		}
 
@@ -446,7 +446,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glUniform4f(glGetUniformLocation(pbr_shader.gl_program, "color"), /*1.0f, 1.0f, 1.0f*//*0.2f, 1.0f, 1.0f*/1.0f, 0.0f, 0.0f, 1.0f);
 		mat4 projection = make_perspective_matrix(/*70*/70, (float)rain.window_width/(float)rain.window_height, 0.1f, 1000.0f);
 
-		float3 camera_p = make_float3(0.0, 0, 7.0f);
+		float3 camera_p = make_float3(0.0, 0, 9.0f);
 		float4 camera_position = {camera_p.x, camera_p.y, camera_p.z, 0.0f};
 		float4_apply_mat4(&camera_position, mat4_euler_rotation(camera_rotation));
 		float3 camera_dir = {0, 0, 0};
@@ -470,17 +470,22 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 
 		glUniformMatrix4fv(glGetUniformLocation(pbr_shader.gl_program, "rotation"), 1, GL_FALSE, euler_to_mat4(rotation).e);
 
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].position"), 2.0f, 1.0f, 5.0f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].position"), -3.0f, 4.0f, 5.0f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].position"), -3.0f, -3.0f, 3.0f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].position"), 3.0f, -2.0f, 4.0f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].color"), 1.0f, 1.0f, 1.0f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].color"), 0.5f, 1.0f, 0.5f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].color"), 0.5f, 1.0f, 0.5f);
-		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].color"), 1.0f, 1.0f, 1.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].position"), -5.0f, -5.0f, 5.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].position"), 5.0f, -5.0f, 5.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].position"), 5.0f, 5.0f, 5.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].position"), -5.0f, 5.0f, 5.0f);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[0].color"), 1.0f, 1.0f, 1.0f /*1.0f, 1.0f, 1.0f*/);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[1].color"), 1.0f, 1.0f, 1.0f /*0.5f, 1.0f, 0.5f*/);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[2].color"), 1.0f, 1.0f, 1.0f /*0.5f, 1.0f, 0.5f*/);
+		glUniform3f(glGetUniformLocation(pbr_shader.gl_program, "lights[3].color"), 1.0f, 1.0f, 1.0f /*1.0f, 1.0f, 1.0f*/);
 
+		//glEnable(GL_TEXTURE_2D)
+		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, env_map[current_env_map]);
 		glUniform1i(glGetUniformLocation(pbr_shader.gl_program, "env_map"), 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, skybox[current_env_map]);
+		glUniform1i(glGetUniformLocation(pbr_shader.gl_program, "spec_map"), 1);
 
 		glEnableVertexAttribArray(glGetAttribLocation(pbr_shader.gl_program, "position"));
 		glVertexAttribPointer(glGetAttribLocation(pbr_shader.gl_program, "position"), 3, GL_FLOAT, GL_FALSE, 0, tri_list->tris);
@@ -545,6 +550,7 @@ int CALLBACK WinMain(HINSTANCE hinstnace, HINSTANCE prev_instance, LPSTR lpcmdli
 		glUniform3f(glGetUniformLocation(skybox_shader.gl_program, "camera_position"), camera_position.x, camera_position.y, camera_position.z);		
 		glUniformMatrix4fv(glGetUniformLocation(skybox_shader.gl_program, "camera"), 1, GL_FALSE, camera.e);
 
+		glActiveTexture(GL_TEXTURE0);
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, skybox[current_env_map]);
 
